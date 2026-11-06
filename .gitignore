@@ -1,0 +1,9 @@
+build/
+.west/
+zmk/
+zephyr/
+modules/
+bootloader/
+tools/
+.venv/
+zmk-driver-azoteq-iqs5xx/

@@ -1,0 +1,23 @@
+/*
+ * Shared touchpad plumbing, included by both lily58_left.overlay (central)
+ * and lily58_right.overlay (peripheral). See ZMK docs: "Listener and Input
+ * Split Device" (pointing device on a split peripheral).
+ */
+
+/ {
+    split_inputs {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        trackpad_split: trackpad_split@0 {
+            compatible = "zmk,input-split";
+            reg = <0>;
+        };
+    };
+
+    trackpad_listener: trackpad_listener {
+        compatible = "zmk,input-listener";
+        status = "disabled";
+        device = <&trackpad_split>;
+    };
+};
