@@ -1,6 +1,0 @@
-#include "lily58_touchpad.dtsi"
-
-/* Central: enable the listener that consumes the right half's touchpad events. */
-&trackpad_listener {
-    status = "okay";
-};

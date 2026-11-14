@@ -1,2 +1,0 @@
-config SHIELD_TOUCHPAD_RIGHT
-    def_bool $(shields_list_contains,touchpad_right)
