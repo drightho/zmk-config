@@ -1,0 +1,15 @@
+# Custom status screen for the right (peripheral) half's Nice!View.
+# List this shield AFTER nice_view in the build's SHIELD list.
+
+if SHIELD_NICE_VIEW_AWESOMES
+
+config AWESOMES_STATUS_WIDGET
+    bool "Right-half Nice!View status screen (battery, Caps/Num Lock, name)"
+    default y
+    select LV_FONT_MONTSERRAT_10
+    select LV_FONT_MONTSERRAT_12
+    select LV_FONT_MONTSERRAT_16
+    select LV_USE_IMG
+    select LV_USE_CANVAS
+
+endif # SHIELD_NICE_VIEW_AWESOMES

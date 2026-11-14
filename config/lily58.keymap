@@ -1,7 +1,6 @@
 /*
  * Based on github.com/typeractivexyz/lily58-wireless-zmk-config (MIT).
- * Encoder sensor-bindings removed (no encoders); touchpad input is handled
- * by trackpad_listener in lily58_left.overlay.
+ * Encoder sensor-bindings removed (no encoders).
  */
 
 /*
