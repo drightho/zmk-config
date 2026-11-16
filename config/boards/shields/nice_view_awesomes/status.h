@@ -7,8 +7,10 @@
 struct zmk_widget_status {
     sys_snode_t node;
     lv_obj_t *obj;
-    lv_color_t cbuf[CANVAS_SIZE * CANVAS_SIZE];  /* battery / Caps / Num */
-    lv_color_t cbuf2[CANVAS_SIZE * CANVAS_SIZE]; /* "The Awesomes!" */
+    lv_color_t cbuf[CANVAS_SIZE * CANVAS_SIZE];  /* battery / link, top of the screen */
+    lv_color_t cbuf4[CANVAS_SIZE * CANVAS_SIZE]; /* Caps / Num, bottom of the screen */
+    lv_color_t cbuf2[CANVAS_SIZE * CANVAS_SIZE]; /* "The Awesomes!" as shown (rotated) */
+    lv_color_t cbuf3[NAME_W * NAME_H];           /* "The Awesomes!" drawn upright, hidden */
     struct status_state state;
 };
 

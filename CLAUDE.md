@@ -41,7 +41,11 @@ build.yaml                 # left: lily58_left nice_view_adapter nice_view + sni
 
 How the right screen works: `nice_view_awesomes` must be listed **after** `nice_view`. Its `.conf` sets `CONFIG_NICE_VIEW_WIDGET_STATUS=n` so ZMK's stock peripheral screen isn't compiled, and its CMakeLists builds our own `zmk_display_status_screen()`. Caps/Num Lock come from the host to the left (central) half, which forwards them to the right over BLE: `CONFIG_ZMK_HID_INDICATORS=y` and `CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS=y` must be set on both halves (they are in `lily58.conf`). LVGL has no bold font, so bold is drawn by printing the text twice 1 px apart. Fonts: Montserrat 10 ("The") and 12 ("Awesomes!"); 14 would overflow the 68 px wide screen.
 
-Status: **the right-half Nice!View config has not been built or flashed yet** (the earlier touchpad config built; this machine currently has no west workspace or Zephyr SDK). Verify with a build, then check on hardware that Caps/Num Lock update on the right display. The left half Nice!View is as before: the build uses `nice_view` on SPI0 as `zephyr,display`, identical to the reference Nice!View config (typeractivexyz/lily58-wireless-view-zmk-config).
+Status: both halves build with `west` (left 45% flash, right 34%). The right-half screen has **not been checked on hardware yet**: verify Caps/Num Lock update on it and that nothing is clipped. The shield needs `nice_view_awesomes.overlay` (empty, comment only) because Zephyr only recognises a shield folder that has `<shield>.overlay`.
+
+Right screen layout (top to bottom, as seen by the user; the Nice!View is mounted sideways so each canvas is drawn upright then rotated 90 degrees): battery + link status, then "The Awesomes!" turned 45 degrees clockwise (faux bold; "Awesomes!" also sheared for faux italic; Montserrat 12 / 16; drawn on a hidden 96x40 scratch canvas, then rotated into a 68x68 one), then the CAPS/NUM boxes at the bottom. The three 68x68 canvases overlap on the 160 px screen, so their creation order is their z-order (see `zmk_widget_status_init`). Only Montserrat 10/12/16 are compiled in.
+
+`config/lily58.keymap` mirrors the keymap read from the keyboard over ZMK Studio (USB serial, `/dev/ttyACM0`, protobuf RPC). Studio edits live in the keyboard's flash on top of the compiled keymap, so after editing in Studio re-read the keyboard to keep the file in sync, otherwise the next flash from the file overwrites them.
 
 If the layout differs from this, update this file.
 
