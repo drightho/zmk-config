@@ -10,7 +10,12 @@
 
 #define CANVAS_SIZE 68
 
-/* Hidden scratch canvas for the name: wider than the screen, since it is turned 45 degrees. */
+/* The name's canvas, in the widget's frame (the screen is shown turned 90 degrees, so on screen it
+ * is NAME_CANVAS_H wide and NAME_CANVAS_W tall): everything between the battery row and CAPS. */
+#define NAME_CANVAS_W 112
+#define NAME_CANVAS_H CANVAS_SIZE
+
+/* Hidden scratch canvas for the name: wider than the screen, since it is turned at an angle. */
 #define NAME_W 96
 #define NAME_H 40
 
@@ -22,7 +27,6 @@ struct status_state {
     bool charging;
     bool connected;
     bool caps_lock;
-    bool num_lock;
 };
 
 void rotate_canvas(lv_obj_t *canvas, lv_color_t cbuf[]);
