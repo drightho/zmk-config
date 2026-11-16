@@ -1,0 +1,5 @@
+/*
+ * Intentionally empty. Zephyr only recognises a shield if its folder contains
+ * <shield>.overlay; this shield adds no hardware, only the custom status screen
+ * (see CMakeLists.txt, Kconfig.* and nice_view_awesomes.conf).
+ */

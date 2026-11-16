@@ -1,8 +1,9 @@
 /*
  * Right-half (peripheral) Nice!View screen. Layout is drawn upright into two
  * 68x68 canvases and rotated 90 degrees, the same way ZMK's nice_view widgets do:
- *   canvas 1 (top):    battery, link status, CAPS and NUM indicators
- *   canvas 2 (middle): "The" / "Awesomes!" in (faux) bold
+ *   canvas 1 (top):    battery and link status
+ *   canvas 3 (bottom): CAPS and NUM indicators
+ *   canvas 2 (middle): "The" / "Awesomes!" in (faux) bold italic, turned 45 degrees clockwise
  *
  * Based on ZMK's nice_view peripheral_status.c (Copyright (c) 2023 The ZMK Contributors, MIT).
  */
@@ -51,8 +52,12 @@ static void draw_indicator(lv_obj_t *canvas, int y, const char *name, bool on) {
     lv_canvas_draw_text(canvas, 4, y + 3, CANVAS_SIZE - 8, &right_dsc, on ? "ON" : "OFF");
 }
 
-static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state) {
-    lv_obj_t *canvas = lv_obj_get_child(widget, 0);
+/* Child indexes of the widget, bottom of the z-order first (see zmk_widget_status_init). */
+enum { CHILD_INDICATORS, CHILD_BATTERY, CHILD_NAME, CHILD_SCRATCH };
+
+static void draw_battery_link(lv_obj_t *widget, lv_color_t cbuf[],
+                              const struct status_state *state) {
+    lv_obj_t *canvas = lv_obj_get_child(widget, CHILD_BATTERY);
 
     lv_draw_label_dsc_t label_dsc;
     init_label_dsc(&label_dsc, LVGL_FOREGROUND, &lv_font_montserrat_16, LV_TEXT_ALIGN_RIGHT);
@@ -65,31 +70,91 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     lv_canvas_draw_text(canvas, 0, 0, CANVAS_SIZE, &label_dsc,
                         state->connected ? LV_SYMBOL_WIFI : LV_SYMBOL_CLOSE);
 
+    rotate_canvas(canvas, cbuf);
+}
+
+/* The canvas sits at the bottom of the screen; its CAPS/NUM rows are the lower part of it. */
+static void draw_indicators(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state) {
+    lv_obj_t *canvas = lv_obj_get_child(widget, CHILD_INDICATORS);
+
+    lv_draw_rect_dsc_t rect_black_dsc;
+    init_rect_dsc(&rect_black_dsc, LVGL_BACKGROUND);
+    lv_canvas_draw_rect(canvas, 0, 0, CANVAS_SIZE, CANVAS_SIZE, &rect_black_dsc);
+
     draw_indicator(canvas, 22, "CAPS", state->caps_lock);
     draw_indicator(canvas, 46, "NUM", state->num_lock);
 
     rotate_canvas(canvas, cbuf);
 }
 
-/* LVGL's built-in fonts have no bold face, so fake it: draw the text twice, 1px apart. */
-static void draw_bold_line(lv_obj_t *canvas, int y, const lv_font_t *font, const char *text) {
-    lv_draw_label_dsc_t dsc;
-    init_label_dsc(&dsc, LVGL_FOREGROUND, font, LV_TEXT_ALIGN_CENTER);
-    lv_canvas_draw_text(canvas, 0, y, CANVAS_SIZE - 1, &dsc, text);
-    lv_canvas_draw_text(canvas, 1, y, CANVAS_SIZE - 1, &dsc, text);
+static void draw_status(struct zmk_widget_status *widget) {
+    draw_battery_link(widget->obj, widget->cbuf, &widget->state);
+    draw_indicators(widget->obj, widget->cbuf4, &widget->state);
 }
 
-static void draw_name(lv_obj_t *widget, lv_color_t cbuf[]) {
-    lv_obj_t *canvas = lv_obj_get_child(widget, 1);
+/* LVGL's built-in fonts have no bold face, so fake it: draw the text twice, 1px apart. */
+static void draw_bold_line(lv_obj_t *canvas, int x, int y, const lv_font_t *font,
+                           const char *text) {
+    lv_draw_label_dsc_t dsc;
+    init_label_dsc(&dsc, LVGL_FOREGROUND, font, LV_TEXT_ALIGN_CENTER);
+    lv_canvas_draw_text(canvas, x, y, NAME_W - 1, &dsc, text);
+    lv_canvas_draw_text(canvas, x + 1, y, NAME_W - 1, &dsc, text);
+}
+
+/*
+ * No italic face either, so fake it: shear the rows y0..y1-1 sideways. The top row moves right
+ * the most, one pixel less every ITALIC_STEP rows, and the bottom row stays put. Works on the raw
+ * canvas buffer (one lv_color_t per pixel); pixels shifted off the edge are dropped.
+ */
+#define ITALIC_STEP 4
+
+static void shear_rows(lv_color_t cbuf[], int y0, int y1) {
+    for (int y = y0; y < y1; y++) {
+        int shift = (y1 - 1 - y) / ITALIC_STEP;
+        lv_color_t *row = &cbuf[y * NAME_W];
+        for (int x = NAME_W - 1; x >= 0; x--) {
+            row[x] = (x - shift >= 0) ? row[x - shift] : LVGL_BACKGROUND;
+        }
+    }
+}
+
+/* Rotation of the name, clockwise as seen by the user: 45 degrees on top of the 90 that every
+ * canvas gets, in tenths of a degree. */
+#define NAME_ANGLE (900 + 450)
+
+/* Fonts (only Montserrat 10/12/16 are compiled in) and the top of each line on the scratch canvas. */
+#define NAME_FONT_THE lv_font_montserrat_12
+#define NAME_FONT_AWESOMES lv_font_montserrat_16
+#define NAME_Y_THE 2
+#define NAME_Y_AWESOMES 18
+
+/*
+ * Draw "The Awesomes!" upright on the wide hidden canvas (child 2), then rotate it into the
+ * visible 68x68 canvas (child 1) around the centre of both. Whatever falls outside is trimmed.
+ */
+static void draw_name(lv_obj_t *widget, lv_color_t scratch_buf[]) {
+    lv_obj_t *canvas = lv_obj_get_child(widget, CHILD_NAME);
+    lv_obj_t *scratch = lv_obj_get_child(widget, CHILD_SCRATCH);
 
     lv_draw_rect_dsc_t rect_black_dsc;
     init_rect_dsc(&rect_black_dsc, LVGL_BACKGROUND);
-    lv_canvas_draw_rect(canvas, 0, 0, CANVAS_SIZE, CANVAS_SIZE, &rect_black_dsc);
+    lv_canvas_draw_rect(scratch, 0, 0, NAME_W, NAME_H, &rect_black_dsc);
 
-    draw_bold_line(canvas, 16, &lv_font_montserrat_10, "The");
-    draw_bold_line(canvas, 30, &lv_font_montserrat_12, "Awesomes!");
+    draw_bold_line(scratch, 0, NAME_Y_THE, &NAME_FONT_THE, "The");
+    /* Start 2px left: the shear below pushes the top of the line right by up to 4px. */
+    draw_bold_line(scratch, -2, NAME_Y_AWESOMES, &NAME_FONT_AWESOMES, "Awesomes!");
+    shear_rows(scratch_buf, NAME_Y_AWESOMES, NAME_Y_AWESOMES + NAME_FONT_AWESOMES.line_height);
 
-    rotate_canvas(canvas, cbuf);
+    lv_img_dsc_t img;
+    img.data = (void *)scratch_buf;
+    img.header.cf = LV_IMG_CF_TRUE_COLOR;
+    img.header.w = NAME_W;
+    img.header.h = NAME_H;
+
+    lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
+    lv_canvas_transform(canvas, &img, NAME_ANGLE, LV_IMG_ZOOM_NONE,
+                        CANVAS_SIZE / 2 - NAME_W / 2, CANVAS_SIZE / 2 - NAME_H / 2,
+                        NAME_W / 2, NAME_H / 2, true);
 }
 
 /* ---- battery ------------------------------------------------------------------------------ */
@@ -108,7 +173,7 @@ static void set_battery_status(struct zmk_widget_status *widget,
 #endif
     widget->state.battery = state.level;
 
-    draw_top(widget->obj, widget->cbuf, &widget->state);
+    draw_status(widget);
 }
 
 static void battery_status_update_cb(struct battery_status_state state) {
@@ -147,7 +212,7 @@ static void connection_update_cb(struct connection_state state) {
     struct zmk_widget_status *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
         widget->state.connected = state.connected;
-        draw_top(widget->obj, widget->cbuf, &widget->state);
+        draw_status(widget);
     }
 }
 
@@ -181,7 +246,7 @@ static void indicator_update_cb(struct indicator_state state) {
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
         widget->state.caps_lock = state.caps_lock;
         widget->state.num_lock = state.num_lock;
-        draw_top(widget->obj, widget->cbuf, &widget->state);
+        draw_status(widget);
     }
 }
 
@@ -195,18 +260,37 @@ int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
     widget->obj = lv_obj_create(parent);
     lv_obj_set_size(widget->obj, 160, 68);
 
-    /* Child order matters: draw_top() uses child 0, draw_name() uses child 1. */
+    /*
+     * Canvases are 68x68 and opaque, and the screen is 160 tall, so they overlap; creation order
+     * is z-order. Each canvas only has content in part of its area, and nothing lies under that
+     * part: indicators (bottom), battery/link (top), then the name over both. The child order
+     * must match the CHILD_* enum, which draw_*() use.
+     *
+     * Positions are in the widget's 160x68 frame, which the display shows turned 90 degrees:
+     * x counts from the BOTTOM of the screen, so x = 160 - 68 - y_from_top.
+     */
+    lv_obj_t *indicators = lv_canvas_create(widget->obj);
+    lv_obj_align(indicators, LV_ALIGN_TOP_LEFT, 0, 0); /* screen y 92..160 */
+    lv_canvas_set_buffer(indicators, widget->cbuf4, CANVAS_SIZE, CANVAS_SIZE,
+                         LV_IMG_CF_TRUE_COLOR);
+
     lv_obj_t *top = lv_canvas_create(widget->obj);
-    lv_obj_align(top, LV_ALIGN_TOP_RIGHT, 0, 0);
+    lv_obj_align(top, LV_ALIGN_TOP_RIGHT, 0, 0); /* screen y 0..68 */
     lv_canvas_set_buffer(top, widget->cbuf, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
 
     lv_obj_t *name = lv_canvas_create(widget->obj);
-    lv_obj_align(name, LV_ALIGN_TOP_LEFT, 24, 0);
+    lv_obj_align(name, LV_ALIGN_TOP_LEFT, 58, 0); /* screen y 34..102, centred between the two */
     lv_canvas_set_buffer(name, widget->cbuf2, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
+
+    /* Hidden scratch canvas the name is drawn on before it is rotated into `name`. */
+    lv_obj_t *scratch = lv_canvas_create(widget->obj);
+    lv_canvas_set_buffer(scratch, widget->cbuf3, NAME_W, NAME_H, LV_IMG_CF_TRUE_COLOR);
+    lv_obj_add_flag(scratch, LV_OBJ_FLAG_HIDDEN);
 
     sys_slist_append(&widgets, &widget->node);
 
-    draw_name(widget->obj, widget->cbuf2);
+    draw_name(widget->obj, widget->cbuf3);
+    draw_status(widget);
 
     widget_battery_status_init();
     widget_connection_status_init();

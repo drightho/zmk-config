@@ -10,7 +10,9 @@
 
 LV_IMG_DECLARE(bolt);
 
-void rotate_canvas(lv_obj_t *canvas, lv_color_t cbuf[]) {
+/* Rotate the canvas content clockwise by `angle` (tenths of a degree) around its centre. */
+void rotate_canvas_angle(lv_obj_t *canvas, lv_color_t cbuf[], int16_t angle, lv_coord_t offset_x,
+                         lv_coord_t offset_y) {
     static lv_color_t cbuf_tmp[CANVAS_SIZE * CANVAS_SIZE];
     memcpy(cbuf_tmp, cbuf, sizeof(cbuf_tmp));
     lv_img_dsc_t img;
@@ -20,8 +22,13 @@ void rotate_canvas(lv_obj_t *canvas, lv_color_t cbuf[]) {
     img.header.h = CANVAS_SIZE;
 
     lv_canvas_fill_bg(canvas, LVGL_BACKGROUND, LV_OPA_COVER);
-    lv_canvas_transform(canvas, &img, 900, LV_IMG_ZOOM_NONE, -1, 0, CANVAS_SIZE / 2,
-                        CANVAS_SIZE / 2, true);
+    lv_canvas_transform(canvas, &img, angle, LV_IMG_ZOOM_NONE, offset_x, offset_y,
+                        CANVAS_SIZE / 2, CANVAS_SIZE / 2, true);
+}
+
+/* The Nice!View is mounted rotated, so every canvas is turned 90 degrees to read upright. */
+void rotate_canvas(lv_obj_t *canvas, lv_color_t cbuf[]) {
+    rotate_canvas_angle(canvas, cbuf, 900, -1, 0);
 }
 
 void draw_battery(lv_obj_t *canvas, const struct status_state *state) {
