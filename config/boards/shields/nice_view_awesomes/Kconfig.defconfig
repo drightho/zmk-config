@@ -8,6 +8,7 @@ config AWESOMES_STATUS_WIDGET
     default y
     select LV_FONT_MONTSERRAT_10
     select LV_FONT_MONTSERRAT_12
+    select LV_FONT_MONTSERRAT_14
     select LV_FONT_MONTSERRAT_16
     select LV_USE_IMG
     select LV_USE_CANVAS
